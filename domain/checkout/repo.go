@@ -13,7 +13,7 @@ type Repo struct {
 	employeeDynamodbBuilder employeeDynamodbBuilder
 }
 
-type RepoOpts struct {
+type RepoOpt struct {
 	TableName               string
 	DynamodbClient          dynamodbClient
 	EmployeeDynamodbBuilder employeeDynamodbBuilder
@@ -26,7 +26,7 @@ type employeeDynamodbBuilder interface {
 	BuildUpdateBalanceRequest(tableName string, bal entityEmployee.Balance, newBal float64) *dynamodb.Update
 }
 
-func NewRepo(opts RepoOpts) *Repo {
+func NewRepo(opts RepoOpt) *Repo {
 	return &Repo{
 		dynamodbClient:          opts.DynamodbClient,
 		employeeDynamodbBuilder: opts.EmployeeDynamodbBuilder,

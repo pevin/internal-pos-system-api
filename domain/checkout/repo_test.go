@@ -53,7 +53,7 @@ func TestTransactSuccess(t *testing.T) {
 	dynamodbClient := new(mockedDynamodbClient)
 	builder := new(mockEmployeeDynamodbBuilder)
 	tableName := "test-table-name"
-	opts := checkout.RepoOpts{
+	opts := checkout.RepoOpt{
 		TableName:               tableName,
 		DynamodbClient:          dynamodbClient,
 		EmployeeDynamodbBuilder: builder,
