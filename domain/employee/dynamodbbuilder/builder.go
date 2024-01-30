@@ -11,7 +11,13 @@ import (
 	"github.com/pevin/internal-pos-service-api/domain/employee/entity"
 )
 
-func BuildGetRFIDQueryInput(employee entity.Employee, tableName string) (*dynamodb.QueryInput, error) {
+type DynamodbBuilder struct{}
+
+func NewDynamodbBuilder() *DynamodbBuilder {
+	return &DynamodbBuilder{}
+}
+
+func (b *DynamodbBuilder) BuildGetRFIDQueryInput(employee entity.Employee, tableName string) (*dynamodb.QueryInput, error) {
 	keyCond := expression.Key("RFIDPK").
 		Equal(expression.Value(employee.GetRFIDPK())).
 		And(expression.Key("RFIDSK").Equal(expression.Value(employee.GetRFIDSK())))
@@ -32,7 +38,7 @@ func BuildGetRFIDQueryInput(employee entity.Employee, tableName string) (*dynamo
 	}, nil
 }
 
-func BuildUpdateBalanceRequest(tableName string, bal entity.Balance, newBal float64) *dynamodb.Update {
+func (b *DynamodbBuilder) BuildUpdateBalanceRequest(tableName string, bal entity.Balance, newBal float64) *dynamodb.Update {
 	return &dynamodb.Update{
 		TableName:        aws.String(tableName),
 		Key:              bal.ToKey(),
