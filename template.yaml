@@ -1,0 +1,280 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Environment:
+      Variables:
+        APP_AWS_REGION: ap-southeast-1
+        APP_ENV: !Ref Stage
+        TABLE_NAME: !Join [ "-", [ "internal-pos", !Ref Stage ] ]
+    Timeout: 10
+
+Parameters:
+  Stage:
+    Type: String
+    Default: test
+  CognitoUserPoolArn:
+    Type: String
+    Default: arn:aws:cognito-idp:ap-southeast-1:000000000000:userpool/ap-southeast-1_v0VkJXdnK
+  CognitoUserPoolId:
+    Type: String
+    Default: ap-southeast-1_v0VkJXdnK
+
+Resources:
+  # API GATEWAY
+  InternalPosService:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Stage
+      OpenApiVersion: 3.0.3
+      BinaryMediaTypes:
+        - "multipart/form-data"
+      GatewayResponses:
+        BAD_REQUEST_BODY:
+          ResponseTemplates:
+            "application/json": "{\"message\": \"$context.error.validationErrorString\", \"success\": false, \"data\": null}"
+        UNAUTHORIZED:
+          ResponseTemplates:
+            "application/json": "{\"message\": \"Unauthorized.\", \"success\": false, \"data\": null}"
+        DEFAULT_4XX:
+          ResponseTemplates:
+            "application/json": "{\"message\": \"Invalid request.\", \"success\": false, \"data\": null}"
+        DEFAULT_5XX:
+          StatusCode: 500
+          ResponseTemplates:
+            "application/json": "{\"message\": \"Oops. Something went wrong. Please try again in a moment.\", \"success\": false, \"data\": null}"
+      EndpointConfiguration:
+        Type: REGIONAL
+      Auth:
+        DefaultAuthorizer: InteralPosServiceCognitoAuthorizer
+        Authorizers:
+          InteralPosServiceCognitoAuthorizer:
+            UserPoolArn: !Ref CognitoUserPoolArn
+      Models:
+        CreateCheckoutRequestBody:
+          type: object
+          required:
+            - rfid
+            - station
+            - items
+          properties:
+            rfid:
+              type: string
+            station:
+              type: string
+            items:
+              type: array
+              items:
+                type: object
+                required:
+                  - name
+                  - code
+                  - category
+                  - price
+                  - calories
+                  - qty
+                properties:
+                  name:
+                    type: string
+                  code:
+                    type: string
+                  category:
+                    type: string
+                  price:
+                    type: number
+                  calories:
+                    type: number
+                  qty:
+                    type: number
+
+  # FUNCTIONS
+  CreateCheckoutFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: createcheckout
+      CodeUri: dist/functions/createcheckout
+      Runtime: go1.x
+      Policies:
+        - AWSLambdaExecute
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:DeleteItem
+                - dynamodb:PutItem
+                - dynamodb:Scan
+                - dynamodb:Query
+                - dynamodb:UpdateItem
+                - dynamodb:BatchWriteItem
+                - dynamodb:BatchGetItem
+                - dynamodb:ConditionCheckItem
+              Resource:
+                - Fn::GetAtt: [InternalPosDynamoDBTable, Arn]
+                - !Join [ "/", [ !GetAtt InternalPosDynamoDBTable.Arn, "index/*"] ]
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref InternalPosService
+            Path: /checkouts
+            Method: POST
+            RequestModel:
+              Model: CreateCheckoutRequestBody
+              ValidateBody: true
+
+  # DB Tables
+  InternalPosDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        -
+          AttributeName: "PK"
+          AttributeType: "S"
+        -
+          AttributeName: "SK"
+          AttributeType: "S"
+        -
+          AttributeName: "GSI1PK"
+          AttributeType: "S"
+        -
+          AttributeName: "GSI1SK"
+          AttributeType: "S"
+        -
+          AttributeName: "GSI2PK"
+          AttributeType: "S"
+        -
+          AttributeName: "GSI2SK"
+          AttributeType: "S"
+        -
+          AttributeName: "RFIDPK"
+          AttributeType: "S"
+        -
+          AttributeName: "RFIDSK"
+          AttributeType: "S"
+      KeySchema:
+        -
+          AttributeName: "PK"
+          KeyType: "HASH"
+        -
+          AttributeName: "SK"
+          KeyType: "RANGE"
+      BillingMode: "PAY_PER_REQUEST"
+      TableName: !Join [ "-", [ "internal-pos-service", !Ref Stage ] ]
+      GlobalSecondaryIndexes:
+        -
+          IndexName: "GSI1"
+          KeySchema:
+            -
+              AttributeName: "GSI1PK"
+              KeyType: "HASH"
+            -
+              AttributeName: "GSI1SK"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+        -
+          IndexName: "GSI2"
+          KeySchema:
+            -
+              AttributeName: "GSI2PK"
+              KeyType: "HASH"
+            -
+              AttributeName: "GSI2SK"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+        -
+          IndexName: "RFID"
+          KeySchema:
+            -
+              AttributeName: "RFIDPK"
+              KeyType: "HASH"
+            -
+              AttributeName: "RFIDSK"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "INCLUDE"
+            NonKeyAttributes:
+              - "employee_number"
+
+  # S3
+  InternalPosServiceBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Join [ "-", [ "internal-pos-service-resources", !Ref Stage ] ]
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+  InternalPosBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket:
+        Ref: 'InternalPosServiceBucket'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource:
+              Fn::Join:
+                - ''
+                - - 'arn:aws:s3:::'
+                  - Ref: 'InternalPosServiceBucket'
+                  - '/*'
+
+  # SQS
+  ReplenishBalanceQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Join [ "-", [ "internal-pos-service", !Ref Stage, "replenish-balance" ] ]
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+            - "ReplenishBalanceDLQ"
+            - "Arn"
+        maxReceiveCount: 5
+  ReplenishBalanceDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Join [ "-", [ "internal-pos-service", !Ref Stage, "replenish-balance-dlq" ] ]
+
+  # Event Bridge
+  InternalPosCutoffLambdaSchedulerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join [ "-", [ "internal-pos-service", !Ref Stage, "cutoff-lambda-scheduler-role" ] ]
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - scheduler.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: !Join [ "-", [ "internal-pos-service", !Ref Stage, "cutoff-lambda-scheduler-policy" ] ]
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "lambda:InvokeFunction"
+                Resource:
+                  - !GetAtt CreateCutoffFunction.Arn
+                  - !Join [ ":", [ !GetAtt CreateCutoffFunction.Arn, "*" ] ]
+  InternalPosCutoffSchedulerGroup:
+    Type: AWS::Scheduler::ScheduleGroup
+    Properties:
+      Name: !Join [ "-", [ "internal-pos-service", !Ref Stage, "cutoff-scheduler-group" ] ]
+
+
+Outputs:
+  URLEndpoint:
+    Description: "API endpoint"
+    Value: !Sub "https://${InternalPosService}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/"
