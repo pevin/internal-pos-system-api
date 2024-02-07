@@ -1,5 +1,8 @@
 # internal-pos-system-api
 
+> **Important Note:** This github repository consist only a small portion of the whole system along with a documentation on how the system was design.
+> This is meant to share how to design serverless architecture given a particular requirements.
+
 ## Overview
 
 A cloud-based, serverless API for a multi-tenant Point of Sale (POS) system. The POS system is meant to be used internally within the vicinity of each tenant and main consumers are their employees.
