@@ -46,7 +46,7 @@ func Handle(ctx context.Context, req events.APIGatewayProxyRequest) (res events.
 		EmployeeRepo: empRepo,
 		CheckoutRepo: checkoutRepo,
 	})
-	tmpUser := entityUser.User{}
+	tmpUser := entityUser.TemporaryUser()
 	request := rest.Request{
 		Body: req.Body,
 		User: tmpUser,

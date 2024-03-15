@@ -9,7 +9,7 @@ import (
 )
 
 type Request struct {
-	User entityUser.User
+	User *entityUser.User
 	Body string
 }
 
@@ -24,7 +24,7 @@ func FromAPIGatewayProxy(req events.APIGatewayProxyRequest) (Request, error) {
 	}, nil
 }
 
-func getUserFromAPIGatewayProxy(reqContext events.APIGatewayProxyRequestContext) (u entityUser.User, err error) {
+func getUserFromAPIGatewayProxy(reqContext events.APIGatewayProxyRequestContext) (u *entityUser.User, err error) {
 	authClaim, err := json.Marshal(reqContext.Authorizer["claims"])
 	if err != nil {
 		log.Printf("Got error marshaling auth claims: %s", err)

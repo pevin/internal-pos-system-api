@@ -19,6 +19,15 @@ func (u User) ToPartialUser() PartialUser {
 	}
 }
 
+func TemporaryUser() *User {
+	return &User{
+		Username:   "temp-username",
+		GivenName:  "Fred",
+		FamilyName: "Merc",
+		Email:      "fred@merc.com",
+	}
+}
+
 type PartialUser struct {
 	Username string `dynamodbav:"username" json:"username,omitempty"`
 	Name     string `dynamodbav:"name" json:"name,omitempty"`

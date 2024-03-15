@@ -47,7 +47,7 @@ func TestServiceCreateSuccess(t *testing.T) {
 	require.NoError(t, marshalErr)
 
 	// set mock response
-	u := userEntity.User{
+	u := &userEntity.User{
 		Username:   "test-user",
 		GivenName:  "john",
 		FamilyName: "wick",
