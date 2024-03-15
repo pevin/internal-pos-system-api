@@ -8,55 +8,45 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/pevin/internal-pos-service-api/domain/checkout/entity"
-	"github.com/pevin/internal-pos-service-api/domain/checkout/rest"
+	restCheckout "github.com/pevin/internal-pos-service-api/domain/checkout/rest"
 	entityEmployee "github.com/pevin/internal-pos-service-api/domain/employee/entity"
-	entityUser "github.com/pevin/internal-pos-service-api/domain/user/entity"
+	"github.com/pevin/internal-pos-service-api/lib/rest"
 	"github.com/rs/zerolog/log"
 )
 
 type Service struct {
-	checkoutRepo checkoutRepo
-	employeeRepo employeeRepo
-	authService  authService
+	checkoutRepo CheckoutRepo
+	employeeRepo EmployeeRepo
 }
 
 type ServiceOpt struct {
-	CheckoutRepo checkoutRepo
-	EmployeeRepo employeeRepo
-	AuthService  authService
+	CheckoutRepo CheckoutRepo
+	EmployeeRepo EmployeeRepo
 }
 
-type checkoutRepo interface {
+//go:generate mockery --name CheckoutRepo
+type CheckoutRepo interface {
 	Transact(co entity.Checkout, bal entityEmployee.Balance, newBal float64) error
 }
 
-type employeeRepo interface {
+//go:generate mockery --name EmployeeRepo
+type EmployeeRepo interface {
 	GetEmployeeNumberFromRFID(rfid, companyID string) (string, error)
 	GetEmployeeAndBalance(employeeNumber, companyID string) (entityEmployee.Employee, entityEmployee.Balance, error)
-}
-
-type authService interface {
-	FromRequestContext(req events.APIGatewayProxyRequestContext) (entityUser.User, error)
 }
 
 func NewService(opt ServiceOpt) *Service {
 	return &Service{
 		checkoutRepo: opt.CheckoutRepo,
 		employeeRepo: opt.EmployeeRepo,
-		authService:  opt.AuthService,
 	}
 }
 
-func (s *Service) Create(ctx context.Context, req events.APIGatewayProxyRequest) (res events.APIGatewayProxyResponse, err error) {
-	// Get user from request context
-	u, err := s.authService.FromRequestContext(req.RequestContext)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to get user from request context.")
-		return
-	}
+func (s *Service) Create(ctx context.Context, req rest.Request) (res events.APIGatewayProxyResponse, err error) {
+	u := req.User
 
 	// Get create request payload
-	var rp rest.CreateRequestPayload
+	var rp restCheckout.CreateRequestPayload
 	err = json.Unmarshal([]byte(req.Body), &rp)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to unmarshal create checkout request payload.")
@@ -129,8 +119,7 @@ func (s *Service) Create(ctx context.Context, req events.APIGatewayProxyRequest)
 	if co.TotalNetAmount > bal.Balance {
 		// balance is not sufficient - return bad request
 		// todo: return bad request
-		res.StatusCode = 400
-		res.Body = fmt.Sprintf("insufficient balance %f %f", co.TotalNetAmount, bal.Balance)
+		res = rest.BadRequestResponse(fmt.Sprintf("insufficient balance %f %f", co.TotalNetAmount, bal.Balance))
 		return
 	}
 
@@ -141,12 +130,13 @@ func (s *Service) Create(ctx context.Context, req events.APIGatewayProxyRequest)
 	err = s.checkoutRepo.Transact(co, bal, balAfter)
 	if err != nil {
 		log.Error().Err(err).Msg("Got error when saving checkout and balance in")
+		return
 	}
 
 	// Prepare response payload
-	resp := rest.CheckoutResponsePayload{
+	resp := restCheckout.CheckoutResponsePayload{
 		Checkout: co,
-		Employee: rest.EmployeeResponsePayload{
+		Employee: restCheckout.EmployeeResponsePayload{
 			EmployeeNumber: emp.EmployeeNumber,
 			Name:           emp.GetEmployeeName(),
 			ImageUrl:       emp.ImageUrl,
@@ -155,19 +145,7 @@ func (s *Service) Create(ctx context.Context, req events.APIGatewayProxyRequest)
 		},
 	}
 
-	respByte, err := json.Marshal(resp)
-	if err != nil {
-		log.Error().Err(err).Msg("Error marshalling checkout response payload.")
-		return
-	}
-
-	res = events.APIGatewayProxyResponse{
-		StatusCode: 200,
-		Headers: map[string]string{
-			"content-type": "application/json",
-		},
-		Body: string(respByte),
-	}
+	res = rest.OkResponse(resp, "Checkout successful.")
 
 	return
 }

@@ -9,20 +9,23 @@ import (
 
 type Repo struct {
 	tableName               string
-	dynamodbClient          dynamodbClient
-	employeeDynamodbBuilder employeeDynamodbBuilder
+	dynamodbClient          CheckoutDynamodbClient
+	employeeDynamodbBuilder CheckoutEmployeeDynamodbBuilder
 }
 
 type RepoOpt struct {
 	TableName               string
-	DynamodbClient          dynamodbClient
-	EmployeeDynamodbBuilder employeeDynamodbBuilder
+	DynamodbClient          CheckoutDynamodbClient
+	EmployeeDynamodbBuilder CheckoutEmployeeDynamodbBuilder
 }
 
-type dynamodbClient interface {
+//go:generate mockery --name CheckoutDynamodbClient
+type CheckoutDynamodbClient interface {
 	TransactWriteItems(input *dynamodb.TransactWriteItemsInput) (*dynamodb.TransactWriteItemsOutput, error)
 }
-type employeeDynamodbBuilder interface {
+
+//go:generate mockery --name CheckoutEmployeeDynamodbBuilder
+type CheckoutEmployeeDynamodbBuilder interface {
 	BuildUpdateBalanceRequest(tableName string, bal entityEmployee.Balance, newBal float64) *dynamodb.Update
 }
 
