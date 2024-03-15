@@ -2,6 +2,8 @@ package rest
 
 import (
 	"encoding/json"
+
+	"github.com/aws/aws-lambda-go/events"
 )
 
 type ResponseBody struct {
@@ -18,79 +20,71 @@ func (rb *ResponseBody) String() string {
 	return string(res)
 }
 
-type Response struct {
-	StatusCode        int                 `json:"statusCode"`
-	Headers           map[string]string   `json:"headers"`
-	MultiValueHeaders map[string][]string `json:"multiValueHeaders"`
-	Body              string              `json:"body"`
-	IsBase64Encoded   bool                `json:"isBase64Encoded,omitempty"`
-}
-
 func DefaultHeaders() map[string]string {
 	return map[string]string{
 		"Content-Type": "application/json",
 	}
 }
 
-func BadRequestResponse(msg string) Response {
+func BadRequestResponse(msg string) events.APIGatewayProxyResponse {
 	rb := ResponseBody{
 		Data:    struct{}{},
 		Message: msg,
 		Success: false,
 	}
-	return Response{
+	return events.APIGatewayProxyResponse{
 		StatusCode: 400,
 		Headers:    DefaultHeaders(),
 		Body:       rb.String(),
 	}
 }
 
-func NotFoundResponse(msg string) Response {
+func NotFoundResponse(msg string) events.APIGatewayProxyResponse {
 	rb := ResponseBody{
 		Data:    struct{}{},
 		Message: msg,
 		Success: false,
 	}
-	return Response{
+	return events.APIGatewayProxyResponse{
 		StatusCode: 404,
 		Headers:    DefaultHeaders(),
 		Body:       rb.String(),
 	}
 }
 
-func UnauthorizedResponse(msg string) Response {
+func UnauthorizedResponse(msg string) events.APIGatewayProxyResponse {
 	rb := ResponseBody{
 		Data:    struct{}{},
 		Message: msg,
 		Success: false,
 	}
-	return Response{
+	return events.APIGatewayProxyResponse{
 		StatusCode: 401,
 		Headers:    DefaultHeaders(),
 		Body:       rb.String(),
 	}
 }
 
-func OkResponse(data interface{}, msg string) Response {
+func OkResponse(data interface{}, msg string) events.APIGatewayProxyResponse {
 	rb := ResponseBody{
 		Data:    data,
 		Message: msg,
 		Success: true,
 	}
-	return Response{
+	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
 		Headers:    DefaultHeaders(),
 		Body:       rb.String(),
 	}
 }
 
-func EmptyOkResponse(msg string) Response {
+func EmptyOkResponse(msg string) events.APIGatewayProxyResponse {
 	rb := ResponseBody{
 		Data:    struct{}{},
 		Message: msg,
 		Success: true,
 	}
-	return Response{
+	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
 		Headers:    DefaultHeaders(),
 		Body:       rb.String(),
