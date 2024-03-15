@@ -12,6 +12,8 @@ import (
 	"github.com/pevin/internal-pos-service-api/domain/checkout"
 	"github.com/pevin/internal-pos-service-api/domain/employee"
 	"github.com/pevin/internal-pos-service-api/domain/employee/dynamodbbuilder"
+	entityUser "github.com/pevin/internal-pos-service-api/domain/user/entity"
+	"github.com/pevin/internal-pos-service-api/lib/rest"
 )
 
 func Handle(ctx context.Context, req events.APIGatewayProxyRequest) (res events.APIGatewayProxyResponse, err error) {
@@ -44,7 +46,11 @@ func Handle(ctx context.Context, req events.APIGatewayProxyRequest) (res events.
 		EmployeeRepo: empRepo,
 		CheckoutRepo: checkoutRepo,
 	})
-
-	res, err = checkoutService.Create(ctx, req)
+	tmpUser := entityUser.User{}
+	request := rest.Request{
+		Body: req.Body,
+		User: tmpUser,
+	}
+	res, err = checkoutService.Create(ctx, request)
 	return
 }
